@@ -2,10 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  Activity, ArrowDownRight, ArrowRight, ArrowUpRight, BookOpen, BriefcaseBusiness,
-  Check, ChevronDown, CircleHelp, Clock3, Code2, Compass, FileText, Flame,
+  Activity, AlertCircle, ArrowDownRight, ArrowRight, ArrowUpRight, BookOpen, BriefcaseBusiness,
+  Check, CheckCircle2, ChevronDown, CircleHelp, Clock3, Code2, Compass, FileText, Flame,
   GraduationCap, LayoutDashboard, LoaderCircle, Menu, Plus, Rocket, Search,
-  Settings2, ShieldCheck, Sparkles, Target, UploadCloud, X, Zap
+  Settings2, ShieldAlert, ShieldCheck, Sparkles, Target, UploadCloud, X, Zap
 } from "lucide-react";
 
 type Role = { title: string; required_skills?: string[]; description?: string };
@@ -17,7 +17,25 @@ type Roadmap = {
   target_role?: string; current_skills?: string[]; weekly_hours?: number; total_estimated_hours?: number;
   estimated_total_weeks?: number; roadmap?: RoadmapItem[]; note?: string;
 };
-type GapResult = { gaps?: { skill?: string; status?: string; [key: string]: unknown }[]; [key: string]: unknown };
+type SkillGapItem = {
+  skill: string;
+  normalized_skill?: string;
+  importance: "required" | "preferred" | string;
+  required_level: "beginner" | "intermediate" | "advanced" | string;
+  status: "declared_unverified" | "not_found_in_profile" | string;
+  gap_estimate?: number;
+  explanation: string;
+};
+type GapResult = {
+  student_name?: string;
+  job_title?: string;
+  weekly_hours?: number;
+  skill_results: SkillGapItem[];
+  estimated_gap_score: number;
+  score_note?: string;
+  next_step?: string;
+  project_count_in_profile?: number;
+};
 
 const starterSkills = ["Python", "SQL", "Excel"];
 const fallbackRoles = ["Data Scientist", "Data Analyst", "Data Engineer", "Machine Learning Engineer", "Frontend Developer", "Backend Developer", "Full Stack Developer", "AI Engineer"];
@@ -93,13 +111,39 @@ export default function Home() {
   }
 
   async function analyzeGaps() {
+    if (!role) {
+      setError("Choose a target role first.");
+      return;
+    }
+
+    const matchedRole = roles.find(r => r.title.toLowerCase() === role.toLowerCase());
+    const requiredSkills = matchedRole?.required_skills || [];
+
+    if (!requiredSkills.length) {
+      setError(`No skill requirements found for "${role}". Please select a role with defined requirements or wait for job roles to load.`);
+      return;
+    }
+
     setLoading("gaps"); setError(""); setNotice("");
     try {
       const response = await fetch("/api/backend/api/skills/gaps", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          student: { name: "Student", education: null, skills: skills.map(name => ({ name, level: "beginner" })), projects: [], weekly_hours: hours },
-          job: { title: role, requirements: (roles.find(r => r.title === role)?.required_skills || []).map(skill => ({ skill, importance: "required", required_level: "intermediate" })) }
+          student: {
+            name: "Student",
+            education: null,
+            skills: skills,
+            projects: [],
+            weekly_hours: hours
+          },
+          job: {
+            title: matchedRole ? matchedRole.title : role,
+            requirements: requiredSkills.map(skill => ({
+              skill,
+              importance: "required",
+              required_level: "intermediate"
+            }))
+          }
         })
       });
       const data = await response.json();
@@ -123,7 +167,7 @@ export default function Home() {
           ["Overview", LayoutDashboard], ["Roadmap", Compass], ["Skill gap", Target], ["Resume", FileText]
         ].map(([label, Icon]) => {
           const I = Icon as typeof LayoutDashboard;
-          return <button key={label as string} className={`nav-item ${activeTab === label ? "selected" : ""}`} onClick={() => setActiveTab(label as string)}><I size={17}/>{label as string}{label === "Roadmap" && roadmap && <span className="nav-count">{items.length}</span>}</button>;
+          return <button key={label as string} className={`nav-item ${activeTab === label ? "selected" : ""}`} onClick={() => setActiveTab(label as string)}><I size={17}/>{label as string}{label === "Roadmap" && roadmap && <span className="nav-count">{items.length}</span>}{label === "Skill gap" && gapResult && <span className="nav-count">{gapResult.skill_results.length}</span>}</button>;
         })}
         <p className="nav-label nav-spaced">YOUR PROGRESS</p>
         <div className="sidebar-progress"><div className="progress-row"><span>Learning journey</span><b>{progress}%</b></div><div className="progress-track"><span style={{ width: `${progress}%` }}/></div><small>{complete} of {items.length} milestones completed</small></div>
@@ -165,11 +209,163 @@ export default function Home() {
           </div>
 
           <div className="bottom-grid">
-            <section className="panel roadmap-panel"><div className="section-inline"><div><h3>{activeTab === "Skill gap" ? "Skill-gap analysis" : "Your learning roadmap"}</h3><p>{activeTab === "Skill gap" ? "See what to focus on for your target role." : "Your next milestones, organized into a clear path."}</p></div><span className="subtle-tag">{roadmap ? `${items.length} MILESTONES` : "READY WHEN YOU ARE"}</span></div>
-              {activeTab === "Skill gap" && gapResult ? <pre className="gap-output">{JSON.stringify(gapResult, null, 2)}</pre> : roadmap && items.length ? <div className="timeline">{items.map((item, index) => <div className="timeline-item" key={`${item.skill}-${index}`}><div className={`timeline-node ${item.status?.toLowerCase() === "completed" ? "node-done" : ""}`}>{item.status?.toLowerCase() === "completed" ? <Check size={13}/> : String(index + 1).padStart(2,"0")}</div><div className="timeline-body"><div className="timeline-title"><b>{item.skill}</b><span>{item.estimated_hours ?? "—"} hrs</span></div><p>{item.prerequisites?.length ? `Build on: ${item.prerequisites.join(", ")}` : "Build a strong foundation and practice with a small project."}</p>{item.resources?.length ? <div className="resource-list">{item.resources.map((r, i) => {const title = typeof r === "string" ? r : r.title || r.url || "Learning resource";const url = typeof r === "string" ? "" : r.url || "";return url ? <a key={i} href={url} target="_blank" rel="noreferrer">{title} <ArrowUpRight size={12}/></a> : <span key={i}>{title}</span>;})}</div> : null}</div></div>)}</div> : <div className="empty-state"><span className="empty-icon"><BookOpen size={23}/></span><b>Your roadmap will appear here</b><p>Choose your target role, review your skills, then generate a plan tailored to your weekly schedule.</p><button className="text-button" onClick={generateRoadmap}>Create my first roadmap <ArrowRight size={14}/></button></div>}
-              {roadmap?.note && <p className="roadmap-note">{roadmap.note}</p>}
+            <section className="panel roadmap-panel">
+              <div className="section-inline">
+                <div>
+                  <h3>{activeTab === "Skill gap" ? "Skill-gap analysis" : "Your learning roadmap"}</h3>
+                  <p>{activeTab === "Skill gap" ? "See what to focus on for your target role." : "Your next milestones, organized into a clear path."}</p>
+                </div>
+                <span className="subtle-tag">
+                  {activeTab === "Skill gap"
+                    ? gapResult
+                      ? `${gapResult.skill_results.length} SKILLS EVALUATED`
+                      : "ANALYSIS PENDING"
+                    : roadmap
+                      ? `${items.length} MILESTONES`
+                      : "READY WHEN YOU ARE"}
+                </span>
+              </div>
+
+              {activeTab === "Skill gap" ? (
+                gapResult ? (
+                  <div className="gap-results-container">
+                    <div className="gap-overview-card">
+                      <div className="gap-score-box">
+                        <div className="gap-score-circle">
+                          <span className="gap-score-value">{gapResult.estimated_gap_score}%</span>
+                          <span className="gap-score-label">GAP SCORE</span>
+                        </div>
+                        <div className="gap-overview-text">
+                          <h4>{gapResult.job_title || role} Gap Assessment</h4>
+                          <p>
+                            {gapResult.score_note || "Heuristic estimate based on profile presence and requirement importance. Listed skills are unverified until supported by assessments or project evidence."}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="gap-stats-pills">
+                        <span className="gap-stat-pill pill-declared">
+                          <b>{gapResult.skill_results.filter(s => s.status === "declared_unverified").length}</b> Declared (Unverified)
+                        </span>
+                        <span className="gap-stat-pill pill-missing">
+                          <b>{gapResult.skill_results.filter(s => s.status === "not_found_in_profile").length}</b> Missing from profile
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="gap-notice-banner">
+                      <ShieldAlert size={16} />
+                      <p>
+                        <strong>Verification Note:</strong> Listed skills still need verification. Skills detected in your profile are self-reported and marked as <em>declared (unverified)</em> until confirmed through practical assessments or project evidence.
+                      </p>
+                    </div>
+
+                    <div className="gap-skill-list">
+                      {gapResult.skill_results.map((item, index) => {
+                        const isDeclared = item.status === "declared_unverified";
+                        return (
+                          <div
+                            key={`${item.skill}-${index}`}
+                            className={`gap-skill-card ${isDeclared ? "status-declared" : "status-missing"}`}
+                          >
+                            <div className="gap-skill-card-top">
+                              <div className="gap-skill-tags">
+                                <span className="gap-skill-name">{item.skill}</span>
+                                <span className={`badge-importance ${item.importance.toLowerCase()}`}>
+                                  {item.importance}
+                                </span>
+                                <span className="badge-level">
+                                  Required: {item.required_level}
+                                </span>
+                              </div>
+                              <span className={`badge-status ${isDeclared ? "declared" : "missing"}`}>
+                                {isDeclared ? (
+                                  <>
+                                    <CheckCircle2 size={13} /> Declared (Unverified)
+                                  </>
+                                ) : (
+                                  <>
+                                    <AlertCircle size={13} /> Not Found in Profile
+                                  </>
+                                )}
+                              </span>
+                            </div>
+                            <p className="gap-skill-explanation">{item.explanation}</p>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {gapResult.next_step && (
+                      <div className="gap-next-step">
+                        <Sparkles size={15} />
+                        <span><strong>Next step:</strong> {gapResult.next_step}</span>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="empty-state">
+                    <span className="empty-icon"><Target size={23} /></span>
+                    <b>Skill-gap analysis is ready when you are</b>
+                    <p>Choose your target role, verify your current skills, and run the skill gap analysis to identify focus areas.</p>
+                    <button className="text-button" onClick={analyzeGaps} disabled={loading !== null}>
+                      {loading === "gaps" ? "Analyzing skills…" : "Analyze my skill gap"} <ArrowRight size={14} />
+                    </button>
+                  </div>
+                )
+              ) : roadmap && items.length ? (
+                <div className="timeline">
+                  {items.map((item, index) => (
+                    <div className="timeline-item" key={`${item.skill}-${index}`}>
+                      <div className={`timeline-node ${item.status?.toLowerCase() === "completed" ? "node-done" : ""}`}>
+                        {item.status?.toLowerCase() === "completed" ? <Check size={13} /> : String(index + 1).padStart(2, "0")}
+                      </div>
+                      <div className="timeline-body">
+                        <div className="timeline-title">
+                          <b>{item.skill}</b>
+                          <span>{item.estimated_hours ?? "—"} hrs</span>
+                        </div>
+                        <p>{item.prerequisites?.length ? `Build on: ${item.prerequisites.join(", ")}` : "Build a strong foundation and practice with a small project."}</p>
+                        {item.resources?.length ? (
+                          <div className="resource-list">
+                            {item.resources.map((r, i) => {
+                              const title = typeof r === "string" ? r : r.title || r.url || "Learning resource";
+                              const url = typeof r === "string" ? "" : r.url || "";
+                              return url ? (
+                                <a key={i} href={url} target="_blank" rel="noreferrer">{title} <ArrowUpRight size={12} /></a>
+                              ) : (
+                                <span key={i}>{title}</span>
+                              );
+                            })}
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="empty-state">
+                  <span className="empty-icon"><BookOpen size={23} /></span>
+                  <b>Your roadmap will appear here</b>
+                  <p>Choose your target role, review your skills, then generate a plan tailored to your weekly schedule.</p>
+                  <button className="text-button" onClick={generateRoadmap}>Create my first roadmap <ArrowRight size={14} /></button>
+                </div>
+              )}
+              {activeTab !== "Skill gap" && roadmap?.note && <p className="roadmap-note">{roadmap.note}</p>}
             </section>
-            <section className="panel focus-panel"><div className="section-inline"><div><h3>Learning snapshot</h3><p>A quick view of your plan.</p></div><span className="snapshot-icon"><Activity size={17}/></span></div><div className="snapshot-hero"><div className="snapshot-ring"><span>{progress}%</span></div><div><b>{roadmap ? "Your journey is mapped" : "Your journey starts here"}</b><p>{roadmap ? "Keep showing up, one milestone at a time." : "Generate a roadmap to see your learning progress."}</p></div></div><div className="snapshot-stat"><span><Clock3 size={15}/> Estimated learning time</span><b>{roadmap ? `${roadmap.total_estimated_hours ?? "—"} hrs` : "—"}</b></div><div className="snapshot-stat"><span><CalendarIcon/> Estimated duration</span><b>{roadmap ? `${roadmap.estimated_total_weeks ?? "—"} weeks` : "—"}</b></div><div className="snapshot-stat"><span><Check size={15}/> Milestones completed</span><b>{complete} / {items.length}</b></div><div className="focus-note"><Sparkles size={15}/><span>Small steps, steady progress. Your schedule is built around the time you choose.</span></div></section>
+            <section className="panel focus-panel">
+              <div className="section-inline">
+                <div><h3>Learning snapshot</h3><p>A quick view of your plan.</p></div>
+                <span className="snapshot-icon"><Activity size={17}/></span>
+              </div>
+              <div className="snapshot-hero">
+                <div className="snapshot-ring"><span>{progress}%</span></div>
+                <div><b>{roadmap ? "Your journey is mapped" : "Your journey starts here"}</b><p>{roadmap ? "Keep showing up, one milestone at a time." : "Generate a roadmap to see your learning progress."}</p></div>
+              </div>
+              <div className="snapshot-stat"><span><Clock3 size={15}/> Estimated learning time</span><b>{roadmap ? `${roadmap.total_estimated_hours ?? "—"} hrs` : "—"}</b></div>
+              <div className="snapshot-stat"><span><CalendarIcon/> Estimated duration</span><b>{roadmap ? `${roadmap.estimated_total_weeks ?? "—"} weeks` : "—"}</b></div>
+              <div className="snapshot-stat"><span><Check size={15}/> Milestones completed</span><b>{complete} / {items.length}</b></div>
+              <div className="focus-note"><Sparkles size={15}/><span>Small steps, steady progress. Your schedule is built around the time you choose.</span></div>
+            </section>
           </div>
           <footer><a className="footer-brand" href="#"><Sparkles size={14}/> skillforge.</a><span>Make your next move count.</span><span className="footer-right">Built for curious minds <span>✦</span></span></footer>
         </div>
