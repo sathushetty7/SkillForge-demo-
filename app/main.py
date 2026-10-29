@@ -6,7 +6,7 @@ from app.skill_engine import analyze_gaps
 from app.resume_parser import extract_text_from_pdf
 from app.skill_extractor import extract_skills
 from app.job_roles import JOB_ROLES
-
+from app.roadmap_engine import generate_roadmap
 
 app = FastAPI(
     title="SkillForge AI API",
@@ -170,3 +170,27 @@ def get_job_role(role: str):
         "title": matching_role,
         "required_skills": JOB_ROLES[matching_role],
     }
+
+# -----------------------------
+# Personalized Learning Roadmap
+# -----------------------------
+
+class RoadmapRequest(BaseModel):
+    target_role: str
+    current_skills: list[str] = Field(default_factory=list)
+    weekly_hours: int = Field(default=10, ge=1, le=80)
+
+
+@app.post("/api/roadmap/generate", tags=["Learning Roadmap"])
+def create_learning_roadmap(request: RoadmapRequest):
+    try:
+        return generate_roadmap(
+            target_role=request.target_role,
+            current_skills=request.current_skills,
+            weekly_hours=request.weekly_hours,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=str(exc),
+        ) from exc

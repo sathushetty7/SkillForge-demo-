@@ -1,29 +1,55 @@
-
 JOB_ROLES = {
     "Data Scientist": [
-        "Python", "SQL", "Pandas", "NumPy",
-        "Machine Learning", "Statistics", "Data Analysis"
+        "Python",
+        "SQL",
+        "Pandas",
+        "NumPy",
+        "Machine Learning",
+        "Statistics",
+        "Data Analysis",
     ],
     "Data Analyst": [
-        "Python", "SQL", "Excel", "Power BI",
-        "Pandas", "Statistics", "Data Visualization"
+        "Python",
+        "SQL",
+        "Excel",
+        "Power BI",
+        "Pandas",
+        "Statistics",
+        "Data Visualization",
     ],
     "Data Engineer": [
-        "Python", "SQL", "PostgreSQL", "Git",
-        "ETL", "Data Engineering"
+        "Python",
+        "SQL",
+        "PostgreSQL",
+        "Git",
+        "ETL",
+        "Data Engineering",
     ],
     "AI/ML Engineer": [
-        "Python", "NumPy", "Pandas", "Machine Learning",
-        "Deep Learning", "TensorFlow", "PyTorch"
+        "Python",
+        "NumPy",
+        "Pandas",
+        "Machine Learning",
+        "Deep Learning",
+        "TensorFlow",
+        "PyTorch",
     ],
     "Full-Stack Developer": [
-        "JavaScript", "TypeScript", "React",
-        "Next.js", "SQL", "Git", "REST APIs"
+        "JavaScript",
+        "TypeScript",
+        "React",
+        "Next.js",
+        "SQL",
+        "Git",
+        "REST APIs",
     ],
     "Software Engineer": [
-        "Python", "Java", "Data Structures",
-        "Algorithms", "Object-Oriented Programming",
-        "SQL", "Git"
+        "Python",
+        "Java",
+        "Data Structures",
+        "Algorithms",
+        "Object-Oriented Programming",
+        "SQL",
+        "Git",
     ],
 }
-```
